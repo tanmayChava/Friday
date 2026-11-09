@@ -1,291 +1,181 @@
-# 🤖 Featured Project: FRIDAY (Personalized Telegram AI Assistant)
+# 🤖 FRIDAY — Personalized Telegram AI Assistant
 
-<div align="center">
+[![CI](https://github.com/NexusInno1/Friday/actions/workflows/ci.yml/badge.svg)](https://github.com/NexusInno1/Friday/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-22+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Google Gemini](https://img.shields.io/badge/Google_Gemini-3.5_Flash-4285F4?logo=google-gemini&logoColor=white)](https://aistudio.google.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-pgvector-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
-[![Tavily](https://img.shields.io/badge/Tavily-Live_Search-FF6F00)](https://tavily.com/)
-[![grammY](https://img.shields.io/badge/Telegram_Bot-grammY-24A1DE?logo=telegram&logoColor=white)](https://grammy.dev/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Vitest-184_Passing-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
-
-**An autonomous, single-owner AI executive assistant operating over Telegram, engineered with long-term semantic vector memory, real-time web research, multi-provider outage failover, and proactive scheduled briefings.**
-
+**FRIDAY** is an intelligent, personalized Telegram-based AI assistant inspired by Marvel's FRIDAY. Built with **TypeScript / Node.js**, powered by **Google Gemini 3.5 Flash Lite** via the **Vercel AI SDK**, backed by **Supabase (pgvector)**, and equipped with **Tavily AI Web Search**, tiered multi-provider outage failover (**Groq** & **OpenAI**), and automated **minute-by-minute reminders & daily morning briefings**.
 
 ---
 
-</div>
+## ✨ Features
 
-## 📌 Executive Summary
-
-**FRIDAY** is an intelligent assistant designed to act as a 24/7 autonomous executive partner. Built from scratch with **TypeScript ESM** and **Node.js 22**, it bridges cutting-edge LLMs with persistent PostgreSQL vector storage, proactive background cron scheduling, and Telegram's interactive messaging interface.
-
-- **Author & Architect:** [Tanmay Chavhan (@tanmayChava)](https://github.com/tanmayChava)
-- **Repository:** [NexusInno1/Friday](https://github.com/NexusInno1/Friday)
-- **Test Suite:** **184 tests across 26 test suites (100% pass rate)**
+- 🧠 **Long-Term Semantic Memory**: Stores facts, preferences, and project notes using **pgvector** embeddings (`gemini-embedding-2`, 768 dimensions) with cosine similarity recall.
+- 🔍 **Live Web Search & Research**: Real-time factual queries, multi-pillar news summaries, and URL extractions powered by **Tavily AI Search API** with daily volume tracking and quota protection (50 requests/day).
+- ⏰ **Smart Reminders & Scheduler**: Natural language reminder scheduling (`/remind`), minute-by-minute alert notifications, and interactive inline **Snooze / Cancel** buttons.
+- ☀️ **Proactive Daily Briefing**: Timezone-aware morning briefing sent straight to your Telegram at your configured time.
+- 🛡️ **Tiered Model Outage Failover**: Zero-downtime resilience cascading from Google Gemini 3.5 Flash Lite ➔ Groq (`llama-3.3-70b-versatile`) ➔ OpenAI (`gpt-4o`).
+- 🔒 **Single-Owner Whitelist Security**: Strict Telegram User ID verification drops unauthorized messages silently.
+- ⚡ **Dual-Mode Startup**: Long Polling mode for zero-setup local dev; Webhook mode ready for cloud production.
+- 🐳 **Docker & 1-Click Railway Deployment**: Multi-stage `Dockerfile` and `docker-compose.yml` with HTTP health check probe ready for 24/7 hosting.
 
 ---
 
-## ⚡ System Architecture
+## 🛠️ Tech Stack
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Telegram Private Chat                           │
-│                      (Strict Owner Auth Guard)                         │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                     grammY Runtime Middleware Engine                   │
-│         (Dual-mode: Zero-tunnel Polling ⇄ High-throughput Webhook)     │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-          ┌─────────────────────────┼─────────────────────────┐
-          ▼                         ▼                         ▼
-┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
-│  Tiered Failover │      │ Long-Term Memory │      │ Proactive Engine │
-│  LLM Engine      │      │ (pgvector HNSW)  │      │ (Croner Runner)  │
-│  - Gemini 3.5    │      │ - Cosine Recall  │      │ - Morning Digest │
-│  - Groq Llama 3  │      │ - Auto Extract   │      │ - Minute Alerts  │
-│  - OpenAI GPT-4o │      │ - Superseding    │      │ - Lease Lock     │
-└──────────────────┘      └──────────────────┘      └──────────────────┘
+- **Runtime**: Node.js 22+ (TypeScript ESM, strict mode)
+- **Telegram Framework**: [grammY](https://grammy.dev)
+- **AI Engine**: [Vercel AI SDK](https://sdk.vercel.ai) (`ai`, `@ai-sdk/google`, `@ai-sdk/openai`)
+- **Primary LLM**: Google Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`, with Groq and OpenAI automated tiered fallbacks)
+- **Vector Database**: [Supabase](https://supabase.com) (PostgreSQL + `pgvector` + HNSW indexing)
+- **Web Search**: [Tavily AI Search API](https://tavily.com)
+- **Scheduler**: [Croner](https://github.com/Hexagon/croner)
+- **Configuration**: Zod validation with fail-fast startup
+
+---
+
+## 🚀 Quick Start (Local Development)
+
+### 1. Prerequisites
+- [Node.js 22+](https://nodejs.org)
+- A Telegram Bot Token from [@BotFather](https://t.me/BotFather)
+- Your Telegram User ID from [@userinfobot](https://t.me/userinfobot)
+- A free [Google AI Studio API Key](https://aistudio.google.com/app/apikey)
+- A free [Tavily Search API Key](https://tavily.com)
+- A free [Supabase Project](https://supabase.com)
+
+### 2. Clone & Install
+```bash
+git clone https://github.com/NexusInno1/Friday.git
+cd friday
+npm install
 ```
 
----
+### 3. Initialize Database
+Follow the instructions in [`supabase/README.md`](./supabase/README.md) to run `supabase/schema.sql` in your Supabase SQL Editor.
 
-## 🔬 Core Engineering & Code Walkthrough
-
-### 1. Tiered Multi-Provider Outage Failover (`src/services/agent.service.ts`)
-To achieve zero downtime against API outages and rate limits, FRIDAY cascades automatically:
-**Google Gemini 3.5 Flash ➔ Groq (Llama 3.3 70B) ➔ OpenAI (GPT-4o)**.
-
-```typescript
-// Automatic tier cascade upon retriable upstream failures
-try {
-  const res = await runGeneration(this.model);
-  responseText = res.text;
-  tokensUsed = res.tokensUsed;
-} catch (primaryErr) {
-  if (this.fallbacks.length > 0 && isRetriableModelError(primaryErr)) {
-    logger.warn("model_failover", {
-      fromProvider: env().DEFAULT_LLM_PROVIDER,
-      fromModel: env().GEMINI_MODEL,
-      reason: primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
-    });
-
-    for (const fallback of this.fallbacks) {
-      try {
-        let res: { text: string; tokensUsed?: number };
-
-        // Fallback with simpler schema resilience if tool parser rejects complex schema
-        if (fallback.provider.toLowerCase().includes("groq")) {
-          try {
-            res = await runGeneration(fallback.model);
-          } catch {
-            const simplifiedTools = createSimplifiedTools({ ...turnState });
-            res = await runGeneration(fallback.model, simplifiedTools);
-          }
-        } else {
-          res = await runGeneration(fallback.model);
-        }
-
-        responseText = `${res.text}\n\n_(⚡ Served via ${fallback.provider} fallback)_`;
-        tokensUsed = res.tokensUsed;
-        break;
-      } catch (fallbackErr) {
-        logger.warn("model_fallback_failed", { provider: fallback.provider });
-      }
-    }
-  }
-}
+### 4. Configure Environment
+```bash
+cp .env.example .env
+```
+Fill in your credentials in `.env`:
+```env
+TELEGRAM_BOT_TOKEN="your-bot-token-from-botfather"
+TELEGRAM_ALLOWED_USER_ID="your-numeric-user-id"
+GEMINI_API_KEY="your-gemini-api-key"
+GEMINI_MODEL="gemini-3.5-flash-lite"
+TAVILY_API_KEY="your-tavily-api-key"
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+USER_TIMEZONE="Asia/Kolkata"
+USER_NAME="Boss"
+DAILY_TAVILY_CALL_CAP="50"
 ```
 
----
+### 5. Run Locally
+```bash
+# Start with hot-reloading
+npm run dev
 
-### 2. Semantic Memory & Vector Cosine Recall (`src/actions/actions.ts`)
-Stores facts and life preferences with 768-dimensional embeddings generated via `gemini-embedding-2` and recalls them using PostgreSQL `pgvector` HNSW index queries:
-
-```typescript
-/**
- * Computes 768-dimensional dense vector embeddings
- */
-export async function generateEmbedding(text: string): Promise<number[]> {
-  const { GEMINI_API_KEY, EMBEDDING_MODEL: configuredModel } = env();
-  const activeModel = configuredModel || "gemini-embedding-2";
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:embedContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: `models/${activeModel}`,
-        content: { parts: [{ text }] },
-        outputDimensionality: 768,
-      }),
-    }
-  );
-
-  const data = await response.json();
-  return data.embedding.values;
-}
-
-/**
- * Recalls memories using vector cosine distance RPC in Supabase pgvector
- */
-export async function recallMemoriesAction(
-  query: string,
-  limit = 5,
-  threshold = 0.65
-): Promise<Memory[]> {
-  const queryEmbedding = await generateEmbedding(query);
-  const matched = await store.matchMemories(
-    userId,
-    queryEmbedding,
-    threshold,
-    limit
-  );
-  return matched;
-}
+# Or build and start production bundle
+npm run build
+npm run start
 ```
+Open Telegram, message your bot `/start`, and FRIDAY is live!
 
 ---
 
-### 3. Distributed Lease-Locked Scheduler (`src/db/supabase-datastore.ts`)
-Prevents double-delivery of minute-by-minute reminders across distributed instances using atomic conditional leases:
+## 📱 Telegram Commands
 
-```typescript
-/**
- * Claims due reminders with atomic timestamp lease locks
- */
-async claimDueReminders(nowIso: string, leaseDurationMs: number): Promise<Reminder[]> {
-  const leaseUntilIso = new Date(Date.now() + leaseDurationMs).toISOString();
-
-  // Atomically filter candidates that are due AND unleased or lease-expired
-  const { data: candidates } = await this.db
-    .from("reminders")
-    .select()
-    .lte("trigger_at", nowIso)
-    .eq("is_completed", false)
-    .eq("is_cancelled", false)
-    .is("sent_at", null)
-    .or(`lease_until.is.null,lease_until.lt.${nowIso}`);
-
-  if (!candidates?.length) return [];
-
-  // Claim candidate lease in an atomic update
-  const claimed = await Promise.all(
-    candidates.map(async (reminder) => {
-      const { data } = await this.db
-        .from("reminders")
-        .update({
-          lease_until: leaseUntilIso,
-          delivery_attempts: (reminder.delivery_attempts ?? 0) + 1,
-        })
-        .eq("id", reminder.id)
-        .eq("is_completed", false)
-        .select()
-        .single();
-      return data;
-    })
-  );
-
-  return claimed.filter(Boolean);
-}
-```
-
----
-
-### 4. Zero-Trust Single-Owner Auth Guard (`src/bot/middlewares/auth.ts`)
-Ensures no unauthorized user or group injection can query or view executive memories:
-
-```typescript
-/**
- * Strict owner whitelist & chat-scope isolation
- */
-export async function authMiddleware(ctx: Context, next: NextFunction): Promise<void> {
-  const allowedUserId = env().TELEGRAM_ALLOWED_USER_ID;
-  const userId = ctx.from?.id;
-
-  // 1. Drop unauthorized users silently (zero footprint)
-  if (!userId || userId !== allowedUserId) {
-    console.warn(`[auth] Blocked unauthorized access attempt from ID: ${userId ?? "unknown"}`);
-    return;
-  }
-
-  // 2. Reject group chats, supergroups, and channels
-  if (ctx.chat && ctx.chat.type !== "private") {
-    console.warn(`[auth] Blocked request from non-private chat type: ${ctx.chat.type}`);
-    return;
-  }
-
-  await next();
-}
-```
-
----
-
-## 💬 Supported Telegram Commands
-
-| Command | Action |
+| Command | Description |
 | :--- | :--- |
-| `/start` | Initialize assistant and display operational status |
-| `/briefing [HH:MM]` | Configure proactive daily morning intelligence report |
-| `/reminders` | Interactive reminder list with inline **Snooze** and **Cancel** buttons |
-| `/remember <fact>` | Explicitly save a long-term memory or life preference |
-| `/memories [query]` | Inspect and delete stored vector memories with similarity search |
-| `/search <query>` | Trigger Tavily AI real-time web search with source citations |
-| `/sessions` | Switch conversation threads or isolate project topics |
-| `/history [query]` | Hybrid search over historical chat turns and past decisions |
-| `/status` | View live telemetry, token costs, model latency, and database health |
+| `/start` | Initialize FRIDAY and view system overview |
+| `/briefing [HH:MM]` | View or customize daily morning briefing time |
+| `/reminders` | View active reminders with interactive Snooze/Cancel buttons |
+| `/remember <fact>` | Explicitly save a memory or preference |
+| `/memories [query]` | View and manage stored long-term memories with delete buttons |
+| `/search <query>` | Instant web search with cited sources |
+| `/status` | View system telemetry, uptime, memory count, fallback readiness, and health |
+| `/sessions` | View, manage, and switch between conversation threads |
+| `/history [query]` | Search past conversations, transcripts, and decisions |
+| `/clear` | Archive current session and start a fresh conversation thread |
+| `/help` | Detailed guide with examples |
 
 ---
 
-## 🧪 Verification & Quality Bar
+## 🐳 Running with Docker & Docker Compose
+
+FRIDAY is fully containerized with a production-hardened, multi-stage `Dockerfile` and `docker-compose.yml`.
+
+### Option A: Using Docker Compose (Recommended)
+
+1. Ensure `.env` is created and populated with your API keys:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your credentials
+   ```
+
+2. Start FRIDAY in detached mode:
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Inspect live logs:
+   ```bash
+   docker compose logs -f
+   ```
+
+4. Check health status:
+   ```bash
+   curl http://localhost:8080/health
+   # For deep database readiness check:
+   curl http://localhost:8080/health/ready
+   ```
+
+5. Stop FRIDAY:
+   ```bash
+   docker compose down
+   ```
+
+### Option B: Using Standalone Docker CLI
+
+1. Build the Docker image:
+   ```bash
+   docker build -t friday-ai-assistant .
+   ```
+
+2. Run the container:
+   ```bash
+   docker run -d \
+     --name friday \
+     --restart unless-stopped \
+     --env-file .env \
+     -p 8080:8080 \
+     friday-ai-assistant
+   ```
+
+---
+
+## ☁️ Deploying to Railway (24/7 Hosting)
+
+1. Push your code to a **GitHub repository**.
+2. Go to [railway.com](https://railway.com) and click **"New Project" -> "Deploy from GitHub repo"**.
+3. Select your repository.
+4. Add all environment variables from `.env.example` in Railway under **Variables**.
+5. Railway will automatically detect the `Dockerfile` and `railway.json`, run the health check, and keep FRIDAY running 24/7!
+
+---
+
+## 🧪 Verification & Typechecking
 
 ```bash
-# Typecheck TypeScript codebase (Zero errors)
+# Run TypeScript type check
 npm run typecheck
 
-# Execute full Vitest suite (184 unit & integration tests)
-npm test
-```
-
-```text
- ✓ src/services/agent.test.ts (13 tests)
- ✓ src/actions/actions.test.ts (16 tests)
- ✓ src/services/scheduler.test.ts (11 tests)
- ✓ src/db/supabase-datastore.test.ts (3 tests)
- ✓ src/bot/middlewares/auth.test.ts (6 tests)
- ...
- Test Files  26 passed (26)
-      Tests  184 passed (184)
-   Duration  15.56s
+# Run production build
+npm run build
 ```
 
 ---
 
-## 🛠️ Tech Stack Matrix
-
-| Dimension | Technology |
-| :--- | :--- |
-| **Language & Runtime** | TypeScript 5.8, Node.js 22 (ESM, strict) |
-| **Bot Framework** | [grammY](https://grammy.dev) |
-| **Primary AI Model** | Google Gemini 3.5 Flash |
-| **Failover Models** | Groq (`llama-3.3-70b-versatile`), OpenAI (`gpt-4o`) |
-| **Vector Database** | Supabase (PostgreSQL 15+, `pgvector`, HNSW) |
-| **Embeddings** | Google `gemini-embedding-2` (768 dimensions) |
-| **Web Research** | Tavily Search API |
-| **Task Scheduler** | Croner |
-| **Testing** | Vitest (184 unit & integration tests) |
-
----
-
-<div align="center">
-
-**Crafted by [Tanmay Chavhan (@tanmayChava)](https://github.com/tanmayChava)**  
-*Project Repository: [NexusInno1/Friday](https://github.com/NexusInno1/Friday)*
-
-</div>
+## 📄 License
+MIT License. Created with ❤️ for personal productivity.
