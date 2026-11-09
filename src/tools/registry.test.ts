@@ -1,0 +1,205 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { InMemoryDataStore } from "../db/in-memory-datastore.js";
+import { createTools, createSimplifiedTools } from "./registry.js";
+import { getScheduler } from "../services/scheduler.service.js";
+
+describe("Tool Registry - Scoping & Injection", () => {
+  let store: InMemoryDataStore;
+  const testUserId = 777888;
+  const testChatId = 777888;
+
+  beforeEach(() => {
+    store = new InMemoryDataStore();
+  });
+
+  it("scopes store_memory and recall_memory to injected store and userId", async () => {
+    const tools = createTools({
+      chatId: testChatId,
+      userId: testUserId,
+      store,
+    });
+
+    // Execute store_memory
+    const storeRes = await tools.store_memory.execute(
+      {
+        content: "Prefers dark chocolate over milk chocolate",
+        tags: ["food"],
+        importance: 4,
+      },
+      { toolCallId: "test_call_1", messages: [] }
+    );
+
+    expect(storeRes).toEqual({
+      success: true,
+      stored: "Prefers dark chocolate over milk chocolate",
+    });
+
+    // Verify persisted directly into the injected store
+    const storedList = await store.listMemories(testUserId);
+    expect(storedList.length).toBe(1);
+    expect(storedList[0].content).toBe("Prefers dark chocolate over milk chocolate");
+    expect(storedList[0].user_id).toBe(testUserId);
+
+    // Execute recall_memory via tool
+    const recallRes = await tools.recall_memory.execute(
+      { query: "chocolate", limit: 5 },
+      { toolCallId: "test_call_2", messages: [] }
+    );
+
+    expect(recallRes.found).toBe(true);
+    expect(recallRes.memories.length).toBe(1);
+    expect(recallRes.memories[0].content).toBe("Prefers dark chocolate over milk chocolate");
+  });
+
+  it("scopes set_briefing_time to injected store and userId", async () => {
+    const tools = createTools({
+      chatId: testChatId,
+      userId: testUserId,
+      store,
+    });
+
+    const res = await tools.set_briefing_time.execute(
+      { time: "08:15" },
+      { toolCallId: "test_call_3", messages: [] }
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.new_briefing_time).toBe("08:15");
+
+    // Verify stored in user profile in the injected store
+    const profile = await store.getUserProfile(testUserId);
+    expect(profile?.briefing_time).toBe("08:15");
+    expect(getScheduler().getBriefingTime()).toBe("08:15");
+  });
+
+  it("scopes reminder lifecycle tools to injected store and userId", async () => {
+    const tools = createTools({
+      chatId: testChatId,
+      userId: testUserId,
+      store,
+    });
+
+    // Create reminder
+    const futureMs = Date.now() + 3600 * 1000;
+    const triggerAt = new Date(futureMs).toISOString();
+    const createRes = await tools.create_reminder.execute(
+      {
+        message: "Prepare quarterly presentation",
+        trigger_at: triggerAt,
+        is_recurring: false,
+      },
+      { toolCallId: "test_call_4", messages: [] }
+    );
+
+    expect(createRes.success).toBe(true);
+    expect(createRes.id).toBeDefined();
+
+    // List reminders
+    const listRes = await tools.list_reminders.execute(
+      {},
+      { toolCallId: "test_call_5", messages: [] }
+    );
+    expect(listRes.reminders.length).toBe(1);
+    expect(listRes.reminders[0].message).toBe("Prepare quarterly presentation");
+    expect(listRes.reminders[0].user_id).toBe(testUserId);
+
+    // Snooze reminder
+    const snoozeRes = await tools.snooze_reminder.execute(
+      { reminder_id: createRes.id, minutes: 30 },
+      { toolCallId: "test_call_6", messages: [] }
+    );
+    expect(snoozeRes.success).toBe(true);
+    expect(snoozeRes.new_trigger_at).toBe(new Date(futureMs + 30 * 60 * 1000).toISOString());
+
+    // Cancel reminder
+    const cancelRes = await tools.cancel_reminder.execute(
+      { reminder_id: createRes.id },
+      { toolCallId: "test_call_7", messages: [] }
+    );
+    expect(cancelRes.success).toBe(true);
+
+    const afterCancel = await tools.list_reminders.execute(
+      {},
+      { toolCallId: "test_call_8", messages: [] }
+    );
+    expect(afterCancel.reminders.length).toBe(0);
+  });
+
+  it("scopes search_conversation_history to targetChatId and returns matching excerpts", async () => {
+    const tools = createTools({
+      chatId: testChatId,
+      userId: testUserId,
+      store,
+    });
+
+    const convId = await store.getOrCreateConversation(testChatId);
+    await store.saveMessage(convId, "user", "How should we deploy on Railway?");
+    await store.saveMessage(convId, "assistant", "Use the Dockerfile with port 8080.");
+    await store.updateSessionTitle(convId, "Deployment Discussion");
+
+    const searchRes = await tools.search_conversation_history.execute(
+      { query: "Railway", limit: 5 },
+      { toolCallId: "test_call_9", messages: [] }
+    );
+
+    expect(searchRes.found).toBe(true);
+    expect(searchRes.matches.length).toBeGreaterThan(0);
+    expect(searchRes.matches[0].session_title).toBe("Deployment Discussion");
+    expect(searchRes.matches.some((m) => m.content.includes("Railway"))).toBe(true);
+
+    const dockerRes = await tools.search_conversation_history.execute(
+      { query: "Dockerfile", limit: 5 },
+      { toolCallId: "test_call_9b", messages: [] }
+    );
+    expect(dockerRes.found).toBe(true);
+    expect(dockerRes.matches.some((m) => m.content.includes("8080"))).toBe(true);
+
+    const emptyRes = await tools.search_conversation_history.execute(
+      { query: "nonexistent topic 12345", limit: 5 },
+      { toolCallId: "test_call_10", messages: [] }
+    );
+    expect(emptyRes.found).toBe(false);
+    expect(emptyRes.matches).toEqual([]);
+  });
+
+  it("maintains 1:1 tool registry parity between createTools and createSimplifiedTools", () => {
+    const fullTools = createTools({ chatId: testChatId, userId: testUserId, store });
+    const simplifiedTools = createSimplifiedTools({ chatId: testChatId, userId: testUserId, store });
+
+    const fullKeys = Object.keys(fullTools).sort();
+    const simplifiedKeys = Object.keys(simplifiedTools).sort();
+
+    expect(simplifiedKeys).toEqual(fullKeys);
+    expect(simplifiedKeys).toEqual([
+      "cancel_reminder",
+      "create_reminder",
+      "list_reminders",
+      "recall_memory",
+      "search_conversation_history",
+      "set_briefing_time",
+      "snooze_reminder",
+      "store_memory",
+      "web_search",
+    ]);
+  });
+
+  it("scopes set_briefing_time in createSimplifiedTools to injected store and userId", async () => {
+    const tools = createSimplifiedTools({
+      chatId: testChatId,
+      userId: testUserId,
+      store,
+    });
+
+    const res = await tools.set_briefing_time.execute(
+      { time: "07:45" },
+      { toolCallId: "test_call_simplified_briefing", messages: [] }
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.new_briefing_time).toBe("07:45");
+
+    const profile = await store.getUserProfile(testUserId);
+    expect(profile?.briefing_time).toBe("07:45");
+  });
+});
+

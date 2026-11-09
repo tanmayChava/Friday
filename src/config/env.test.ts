@@ -1,0 +1,218 @@
+import { describe, it, expect } from "vitest";
+import { DEFAULT_GEMINI_MODEL, EnvSchema, env } from "./env.js";
+
+describe("EnvSchema - TELEGRAM_WEBHOOK_SECRET and WEBHOOK_URL rules", () => {
+  const baseValidEnv = {
+    TELEGRAM_BOT_TOKEN: "123456789:ABCDEF_mock_token_for_test",
+    TELEGRAM_ALLOWED_USER_ID: "123456789",
+    DEFAULT_LLM_PROVIDER: "gemini",
+    GEMINI_API_KEY: "mock_gemini_key",
+    TAVILY_API_KEY: "mock_tavily_key",
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "mock_supabase_key",
+    USER_TIMEZONE: "Asia/Kolkata",
+    USER_NAME: "Boss",
+    BRIEFING_TIME: "07:00",
+  };
+
+  it("defaults Gemini to the current supported Flash model", () => {
+    const result = EnvSchema.safeParse(baseValidEnv);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.GEMINI_MODEL).toBe(DEFAULT_GEMINI_MODEL);
+    }
+  });
+
+  it("passes when WEBHOOK_URL is not configured (Long Polling mode)", () => {
+    const result = EnvSchema.safeParse(baseValidEnv);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.WEBHOOK_URL).toBeUndefined();
+      expect(result.data.TELEGRAM_WEBHOOK_SECRET).toBeUndefined();
+    }
+  });
+
+  it("defaults Gemini to the current supported Flash model", () => {
+    const result = EnvSchema.safeParse(baseValidEnv);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.GEMINI_MODEL).toBe(DEFAULT_GEMINI_MODEL);
+    }
+  });
+
+  it("passes when WEBHOOK_URL is empty string and secret is omitted", () => {
+    const result = EnvSchema.safeParse({
+      ...baseValidEnv,
+      WEBHOOK_URL: "",
+      TELEGRAM_WEBHOOK_SECRET: "",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.WEBHOOK_URL).toBeUndefined();
+      expect(result.data.TELEGRAM_WEBHOOK_SECRET).toBeUndefined();
+    }
+  });
+
+  it("passes when WEBHOOK_URL is not set even if TELEGRAM_WEBHOOK_SECRET is short", () => {
+    const result = EnvSchema.safeParse({
+      ...baseValidEnv,
+      WEBHOOK_URL: "",
+      TELEGRAM_WEBHOOK_SECRET: "short",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("fails when WEBHOOK_URL is set but TELEGRAM_WEBHOOK_SECRET is missing", () => {
+    const result = EnvSchema.safeParse({
+      ...baseValidEnv,
+      WEBHOOK_URL: "https://friday.up.railway.app",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path.includes("TELEGRAM_WEBHOOK_SECRET"));
+      expect(issue).toBeDefined();
+      expect(issue?.message).toContain("TELEGRAM_WEBHOOK_SECRET is required and must be at least 16 characters");
+    }
+  });
+
+  it("fails when WEBHOOK_URL is set but TELEGRAM_WEBHOOK_SECRET is less than 16 characters", () => {
+    const result = EnvSchema.safeParse({
+      ...baseValidEnv,
+      WEBHOOK_URL: "https://friday.up.railway.app",
+      TELEGRAM_WEBHOOK_SECRET: "short_secret_15",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path.includes("TELEGRAM_WEBHOOK_SECRET"));
+      expect(issue).toBeDefined();
+    }
+  });
+
+  it("succeeds when WEBHOOK_URL is set and TELEGRAM_WEBHOOK_SECRET is 16 characters or longer", () => {
+    const result = EnvSchema.safeParse({
+      ...baseValidEnv,
+      WEBHOOK_URL: "https://friday.up.railway.app",
+      TELEGRAM_WEBHOOK_SECRET: "super_secret_webhook_token_12345",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.WEBHOOK_URL).toBe("https://friday.up.railway.app");
+      expect(result.data.TELEGRAM_WEBHOOK_SECRET).toBe("super_secret_webhook_token_12345");
+    }
+  });
+
+  it("strips trailing slashes from WEBHOOK_URL", () => {
+    const result = EnvSchema.safeParse({
+      ...baseValidEnv,
+      WEBHOOK_URL: "https://friday.up.railway.app///",
+      TELEGRAM_WEBHOOK_SECRET: "super_secret_webhook_token_12345",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.WEBHOOK_URL).toBe("https://friday.up.railway.app");
+    }
+  });
+
+  it("prioritizes process.env.PORT over HEALTH_PORT when both are provided", () => {
+    const originalPort = process.env.PORT;
+    try {
+      process.env.PORT = "4500";
+      const result = EnvSchema.safeParse({
+        ...baseValidEnv,
+        HEALTH_PORT: "8080",
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.HEALTH_PORT).toBe(4500);
+      }
+    } finally {
+      if (originalPort !== undefined) {
+        process.env.PORT = originalPort;
+      } else {
+        delete process.env.PORT;
+      }
+    }
+  });
+
+  it("defaults HEALTH_PORT to 8080 when neither PORT nor HEALTH_PORT is provided", () => {
+    const originalPort = process.env.PORT;
+    try {
+      delete process.env.PORT;
+      const result = EnvSchema.safeParse(baseValidEnv);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.HEALTH_PORT).toBe(8080);
+      }
+    } finally {
+      if (originalPort !== undefined) {
+        process.env.PORT = originalPort;
+      }
+    }
+  });
+
+  it("returns a mock secret of at least 16 characters in test fallback mode", () => {
+    const loadedEnv = env();
+    expect(loadedEnv.TELEGRAM_WEBHOOK_SECRET).toBeDefined();
+    expect((loadedEnv.TELEGRAM_WEBHOOK_SECRET?.length ?? 0)).toBeGreaterThanOrEqual(16);
+  });
+
+  it("defaults GROQ_MODEL to llama-3.3-70b-versatile and allows groq provider", () => {
+    const result = EnvSchema.safeParse({
+      ...baseValidEnv,
+      DEFAULT_LLM_PROVIDER: "groq",
+      GROQ_API_KEY: "gsk_mock_groq_key",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.DEFAULT_LLM_PROVIDER).toBe("groq");
+      expect(result.data.GROQ_API_KEY).toBe("gsk_mock_groq_key");
+      expect(result.data.GROQ_MODEL).toBe("llama-3.3-70b-versatile");
+    }
+  });
+
+  it("allows custom GROQ_MODEL configuration", () => {
+    const result = EnvSchema.safeParse({
+      ...baseValidEnv,
+      GROQ_API_KEY: "gsk_mock_groq_key",
+      GROQ_MODEL: "llama-3.1-8b-instant",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.GROQ_MODEL).toBe("llama-3.1-8b-instant");
+    }
+  });
+
+  it("defaults OPENAI_MODEL to gpt-4o and allows custom model", () => {
+    const defaultRes = EnvSchema.safeParse(baseValidEnv);
+    expect(defaultRes.success).toBe(true);
+    if (defaultRes.success) {
+      expect(defaultRes.data.OPENAI_MODEL).toBe("gpt-4o");
+    }
+
+    const customRes = EnvSchema.safeParse({
+      ...baseValidEnv,
+      OPENAI_MODEL: "gpt-4o-mini",
+    });
+    expect(customRes.success).toBe(true);
+    if (customRes.success) {
+      expect(customRes.data.OPENAI_MODEL).toBe("gpt-4o-mini");
+    }
+  });
+
+  it("defaults EMBEDDING_MODEL to gemini-embedding-2 and allows custom model", () => {
+    const defaultRes = EnvSchema.safeParse(baseValidEnv);
+    expect(defaultRes.success).toBe(true);
+    if (defaultRes.success) {
+      expect(defaultRes.data.EMBEDDING_MODEL).toBe("gemini-embedding-2");
+    }
+
+    const customRes = EnvSchema.safeParse({
+      ...baseValidEnv,
+      EMBEDDING_MODEL: "text-embedding-custom",
+    });
+    expect(customRes.success).toBe(true);
+    if (customRes.success) {
+      expect(customRes.data.EMBEDDING_MODEL).toBe("text-embedding-custom");
+    }
+  });
+});

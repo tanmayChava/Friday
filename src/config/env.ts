@@ -1,0 +1,147 @@
+import "dotenv/config";
+import { z } from "zod";
+
+export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
+export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+export const DEFAULT_OPENAI_MODEL = "gpt-4o";
+export const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2";
+
+export const EnvSchema = z.object({
+  // Telegram
+  TELEGRAM_BOT_TOKEN: z.string().min(1, "TELEGRAM_BOT_TOKEN is required"),
+  TELEGRAM_ALLOWED_USER_ID: z
+    .string()
+    .min(1, "TELEGRAM_ALLOWED_USER_ID is required")
+    .transform(Number),
+
+  // AI Provider
+  DEFAULT_LLM_PROVIDER: z.enum(["gemini", "openai", "groq"]).default("gemini"),
+  GEMINI_API_KEY: z.string().min(1, "GEMINI_API_KEY is required"),
+  GEMINI_MODEL: z.string().trim().min(1).default(DEFAULT_GEMINI_MODEL),
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_MODEL: z.string().trim().min(1).default(DEFAULT_GROQ_MODEL),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().trim().min(1).default(DEFAULT_OPENAI_MODEL),
+  EMBEDDING_MODEL: z.string().trim().min(1).default(DEFAULT_EMBEDDING_MODEL),
+
+  // Tavily
+  TAVILY_API_KEY: z.string().min(1, "TAVILY_API_KEY is required"),
+
+  // Supabase
+  SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
+
+  // System Settings
+  USER_TIMEZONE: z.string().default("Asia/Kolkata"),
+  USER_NAME: z.string().default("Boss"),
+  BRIEFING_TIME: z.string().default("07:00"), // HH:MM in USER_TIMEZONE
+  BRIEFING_MISSED_GRACE_PERIOD_MINUTES: z.coerce.number().min(1).default(120),
+  DAILY_LLM_CALL_CAP: z.coerce.number().min(1).default(100),
+  DAILY_TAVILY_CALL_CAP: z.coerce.number().min(1).default(50),
+
+  // Deployment
+  WEBHOOK_URL: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (!val || val.trim() === "") return undefined;
+      return val.trim().replace(/\/+$/, "");
+    })
+    .pipe(z.string().url().optional()), // only validate as URL if actually set
+  TELEGRAM_WEBHOOK_SECRET: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
+  HEALTH_PORT: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((val) => Number(process.env.PORT || val || "8080")),
+
+    NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  })
+  .refine(
+    (data) => !data.WEBHOOK_URL || (Boolean(data.TELEGRAM_WEBHOOK_SECRET) && (data.TELEGRAM_WEBHOOK_SECRET?.length ?? 0) >= 16),
+    {
+      message: "TELEGRAM_WEBHOOK_SECRET is required and must be at least 16 characters when WEBHOOK_URL is configured",
+      path: ["TELEGRAM_WEBHOOK_SECRET"],
+    }
+  );
+
+export type Env = z.infer<typeof EnvSchema>;
+
+let _env: Env;
+
+/**
+ * Validates and returns the environment configuration.
+ * Throws with a clear error message listing all missing/invalid vars.
+ * Must be called as the very first thing in index.ts.
+ */
+export function validateEnv(): Env {
+  const result = EnvSchema.safeParse(process.env);
+
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `  • ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    console.error(
+      `\n❌ FRIDAY failed to start — invalid environment configuration:\n\n${issues}\n\n` +
+        `Copy .env.example to .env and fill in the required values.\n`
+    );
+    process.exit(1);
+  }
+
+  _env = result.data;
+
+  // A public webhook without Telegram's secret header is forgeable. Fail closed
+  // instead of silently running the owner-only bot behind an unauthenticated URL.
+  if (_env.WEBHOOK_URL && (!_env.TELEGRAM_WEBHOOK_SECRET || _env.TELEGRAM_WEBHOOK_SECRET.length < 16)) {
+    console.error(
+      "\n❌ TELEGRAM_WEBHOOK_SECRET is required (at least 16 characters) when WEBHOOK_URL is configured.\n" +
+        "Set a random secret (at least 16 characters) or remove WEBHOOK_URL to use polling.\n"
+    );
+    process.exit(1);
+  }
+
+  return _env;
+}
+
+export function setEnv(mockEnv: Env): void {
+  _env = mockEnv;
+}
+
+export function env(): Env {
+  if (!_env) {
+    if (process.env.NODE_ENV === "test" || process.env.VITEST) {
+      _env = {
+        TELEGRAM_BOT_TOKEN: "mock_telegram_token",
+        TELEGRAM_ALLOWED_USER_ID: 123456789,
+        DEFAULT_LLM_PROVIDER: "gemini",
+        GEMINI_API_KEY: "mock_gemini_key",
+        GEMINI_MODEL: DEFAULT_GEMINI_MODEL,
+        OPENAI_API_KEY: undefined,
+        OPENAI_MODEL: DEFAULT_OPENAI_MODEL,
+        GROQ_API_KEY: undefined,
+        GROQ_MODEL: DEFAULT_GROQ_MODEL,
+        EMBEDDING_MODEL: DEFAULT_EMBEDDING_MODEL,
+        TAVILY_API_KEY: "mock_tavily_key",
+        SUPABASE_URL: "https://mock.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "mock_service_key",
+        USER_TIMEZONE: "Asia/Kolkata",
+        USER_NAME: "Boss",
+        BRIEFING_TIME: "07:00",
+        BRIEFING_MISSED_GRACE_PERIOD_MINUTES: 120,
+        DAILY_LLM_CALL_CAP: 100,
+        DAILY_TAVILY_CALL_CAP: 50,
+        WEBHOOK_URL: undefined,
+        TELEGRAM_WEBHOOK_SECRET: "mock_telegram_webhook_secret_16chars",
+        HEALTH_PORT: 8080,
+        NODE_ENV: "test",
+      };
+      return _env;
+    }
+    throw new Error("env() called before validateEnv(). Call validateEnv() first in index.ts.");
+  }
+  return _env;
+}
