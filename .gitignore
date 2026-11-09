@@ -1,0 +1,37 @@
+# ── Dependencies ─────────────────────────────────────────────
+node_modules/
+
+# ── Build output ─────────────────────────────────────────────
+dist/
+*.tsbuildinfo
+
+# ── IDE / AI agent config (not part of project source) ───────
+.agents/
+skills-lock.json
+
+# Environment
+.env
+.env.*
+!.env.example
+.scratch/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Build artifacts
+*.tsbuildinfo
+
+# Temporary planning and agent scratch work
+.scratch/
+
+# Migration state
+.reembed-migration-state.json
